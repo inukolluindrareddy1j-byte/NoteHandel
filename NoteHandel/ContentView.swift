@@ -9,78 +9,68 @@ import SwiftUI
 import CoreData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
+    @Environment(\.managedObjectContext) var viewContext
+    
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)], animation: .bouncy)
     private var items: FetchedResults<Item>
+    @State private var itemToDelete: Item?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(items) { item in
                     NavigationLink {
-                        Text("Item at change \(item.timestamp!, formatter: itemFormatter)")
+                        AddedingNote(editarName: item.editBy ?? "", editable: false, contain: item.body ?? "", item: item)
                     } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+                        Text(item.editBy ?? "No Title")
                     }
                 }
                 .onDelete(perform: deleteItems)
             }
+            .alert(item: $itemToDelete) { item in
+                Alert(
+                    title: Text("Confirm Delete"),
+                    message: Text("Delete this item?"),
+                    primaryButton: .destructive(Text("Delete")) {
+                       deleteItems(items: item)
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
+            .navigationTitle(Text("NoteHandel"))
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem {
                     EditButton()
                 }
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    NavigationLink {
+                        AddedingNote(editable: true)
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
-            Text("Select an item")
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
+    func deleteItems(offsets: IndexSet) {
+        if let index = offsets.first {
+            self.itemToDelete = items[index]
         }
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    func deleteItems(items: Item) {
         withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
+            viewContext.delete(items)
             do {
                 try viewContext.save()
             } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+                print(error)
             }
         }
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
-
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    ContentView()
 }
